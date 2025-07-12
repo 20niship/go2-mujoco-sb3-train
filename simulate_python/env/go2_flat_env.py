@@ -1,9 +1,9 @@
-import gymnasium as gym
 import numpy as np
 from gymnasium.spaces import Box
 import random
 from gymnasium.envs.mujoco import MujocoEnv
 import config
+from .utils import quat_to_euler
 
 
 class MultiGo2Env(MujocoEnv):
@@ -39,8 +39,8 @@ class MultiGo2Env(MujocoEnv):
         render = True  # config.USE_RENDER
         self.render_mode = "human" if render else None
         self.action_space = Box(
-            low=-100,
-            high=100,
+            low=-2,
+            high=2,
             shape=(self.num_agents * self.NUM_JOINTS,),
             dtype=np.float32,
         )
@@ -55,7 +55,16 @@ class MultiGo2Env(MujocoEnv):
         #     dtype=np.float32,
         # )
         self.cmd_vel = [1, 0, 1]
-        self.jpos = np.zeros(self.NUM_JOINTS, dtype=np.float32)
+
+        self._reset_noise_scale = 0.1  # リセット時のノイズスケール
+
+        self.jpos = np.zeros(self.NUM_JOINTS, dtype=np.float32)  # 各関節の位置
+        self.jvel = np.zeros(self.NUM_JOINTS, dtype=np.float32)  # 各関節の速度
+        self.force = np.zeros(self.NUM_JOINTS, dtype=np.float32)  # 各関節のトルク
+        self.imu_acc = np.array([0.0, 0.0, -9.8], dtype=np.float32)  # IMUの加速度
+        self.imu_gyro = np.zeros(3, dtype=np.float32)  # IMUの角速度
+        self.imu_quat = np.array([1.0, 0.0, 0.0, 0.0], dtype=np.float32)
+        self.rot_euler = np.zeros(3, dtype=np.float32)  # オイラー角
 
     def reset(self, seed=None, options=None):
         self.cmd_vel = [
@@ -63,6 +72,7 @@ class MultiGo2Env(MujocoEnv):
             random.uniform(-1.0, 1.0),  # y方向の速度
             random.uniform(-1.0, 1.0),  # 角速度
         ]
+        self.reset_model()
         obs = self._get_obs()
 
         return obs, {}
@@ -71,7 +81,8 @@ class MultiGo2Env(MujocoEnv):
         # ここでは、ロボットが倒れたかどうかをチェックする
         # 例えば、ロボットの高さが一定以下になったら終了
         base_height = self.get_body_com("base_link")[2]
-        return base_height < 0.1
+        euler = self.rot_euler * 180 / np.pi  # ラジアンから度に変換
+        return base_height < 0.2 or abs(euler[1]) > 45 or abs(euler[2]) > 45
 
     @property
     def healthy_reward(self):
@@ -102,8 +113,6 @@ class MultiGo2Env(MujocoEnv):
 
     def step(self, action: np.ndarray):
         action = action.flatten()
-        action = np.array([-0.0] * 12)
-
         xy_position_before = self.get_body_com("base_link")[:2].copy()
         self._do_action_pid(action)
 
@@ -144,7 +153,7 @@ class MultiGo2Env(MujocoEnv):
 
         if self.render_mode == "human":
             self.render()
-        return obs, reward, terminated, False, info
+        return obs, reward, terminated, terminated, info
 
     def _get_obs(self):
         position = self.data.qpos.flat.copy()
@@ -153,12 +162,18 @@ class MultiGo2Env(MujocoEnv):
 
         self.jpos = sensor[0:12]  # 各関節の位置
         self.jvel = sensor[12:24]  # 各関節の速度
-        force = sensor[24:36]  # 各関節のトルク
-        imu_quat = sensor[36:40]  # IMUのクォータニオン
-        imu_gyro = sensor[40:43]
-        imu_acc = sensor[43:46]
-        frame_pos = sensor[46:49]
-        frame_vel = sensor[49:52]
+        self.force = sensor[24:36]  # 各関節のトルク
+        self.imu_quat = sensor[36:40]  # IMUのクォータニオン
+        self.imu_gyro = sensor[40:43]
+        self.imu_acc = sensor[43:46]
+        self.frame_pos = sensor[46:49]
+        self.frame_vel = sensor[49:52]
+        if np.linalg.norm(self.imu_quat) == 0:
+            self.imu_quat = np.array([1.0, 0.0, 0.0, 0.0], dtype=np.float32)
+        else:
+            self.rot_euler = quat_to_euler(
+                self.imu_quat
+            )  # クォータニオンからオイラー角に変換
 
         # contact_force = self.contact_forces.flat.copy()
 
@@ -167,9 +182,9 @@ class MultiGo2Env(MujocoEnv):
 
         obs = np.concatenate(
             [
-                imu_acc,
+                self.imu_acc,
                 # imu_quat,
-                imu_gyro,
+                self.imu_gyro,
                 self.cmd_vel,  # コマンド速度
                 self.jpos,
                 self.jvel,
