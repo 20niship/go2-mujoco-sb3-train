@@ -1,5 +1,4 @@
-# convert quat to euler angles using scipy
-
+from dataclasses import dataclass
 from scipy.spatial.transform import Rotation as R
 
 
@@ -17,3 +16,17 @@ def quat_to_euler(quat):
     return r.as_euler(
         "xyz", degrees=False
     )  # Change 'xyz' to 'zyx' if needed for different convention
+
+
+# sac config
+@dataclass
+class LearningConfig:
+    """
+    Configuration for the learning process
+    """
+
+    policy: str = "MlpPolicy"
+    total_timesteps: int = 2000000
+    buffer_size: int = 1000000
+    learning_rate: float = 0.001
+    gui = False

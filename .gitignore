@@ -8,3 +8,4 @@
 tensorboard/
 uv.lock
 poetry.lock
+log/

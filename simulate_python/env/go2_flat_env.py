@@ -3,7 +3,7 @@ from gymnasium.spaces import Box
 import random
 from gymnasium.envs.mujoco import MujocoEnv
 import config
-from .utils import quat_to_euler
+from .utils import quat_to_euler, LearningConfig
 
 
 class MultiGo2Env(MujocoEnv):
@@ -19,8 +19,7 @@ class MultiGo2Env(MujocoEnv):
         "render_fps": 100,
     }
 
-    def __init__(self):
-        # super().__init__()
+    def __init__(self, cfg: LearningConfig):
         obs_space = Box(
             low=-np.inf, high=np.inf, shape=(self.OBS_SHAPE,), dtype=np.float64
         )
@@ -36,8 +35,7 @@ class MultiGo2Env(MujocoEnv):
         self.num_agents = 1  # 複数体のロボットを扱う
 
         self.observation_space = obs_space
-        render = True  # config.USE_RENDER
-        self.render_mode = "human" if render else None
+        self.render_mode = "human" if cfg.gui else None
         self.action_space = Box(
             low=-2,
             high=2,
@@ -56,7 +54,7 @@ class MultiGo2Env(MujocoEnv):
         # )
         self.cmd_vel = [1, 0, 1]
 
-        self._reset_noise_scale = 0.1  # リセット時のノイズスケール
+        self._reset_noise_scale = 0.02  # リセット時のノイズスケール
 
         self.jpos = np.zeros(self.NUM_JOINTS, dtype=np.float32)  # 各関節の位置
         self.jvel = np.zeros(self.NUM_JOINTS, dtype=np.float32)  # 各関節の速度
