@@ -110,7 +110,6 @@ class MultiGo2Env(MujocoEnv):
 
     def step(self, action: np.ndarray):
         action = action.flatten()
-        action = np.zeros_like(action)
         xy_pos_before = self._get_xy_pos()
         self._do_action_pid(action)
 
