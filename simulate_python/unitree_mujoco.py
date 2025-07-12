@@ -4,8 +4,8 @@ import mujoco.viewer
 from threading import Thread
 import threading
 
-from unitree_sdk2py.core.channel import ChannelFactoryInitialize
-from unitree_sdk2py_bridge import UnitreeSdk2Bridge, ElasticBand
+# from unitree_sdk2py.core.channel import ChannelFactoryInitialize
+# from unitree_sdk2py_bridge import UnitreeSdk2Bridge, ElasticBand
 
 import config
 
@@ -16,17 +16,7 @@ mj_model = mujoco.MjModel.from_xml_path(config.ROBOT_SCENE)
 mj_data = mujoco.MjData(mj_model)
 
 
-if config.ENABLE_ELASTIC_BAND:
-    elastic_band = ElasticBand()
-    if config.ROBOT == "h1" or config.ROBOT == "g1":
-        band_attached_link = mj_model.body("torso_link").id
-    else:
-        band_attached_link = mj_model.body("base_link").id
-    viewer = mujoco.viewer.launch_passive(
-        mj_model, mj_data, key_callback=elastic_band.MujuocoKeyCallback
-    )
-else:
-    viewer = mujoco.viewer.launch_passive(mj_model, mj_data)
+viewer = mujoco.viewer.launch_passive(mj_model, mj_data)
 
 mj_model.opt.timestep = config.SIMULATE_DT
 num_motor_ = mj_model.nu
@@ -38,13 +28,13 @@ time.sleep(0.2)
 def SimulationThread():
     global mj_data, mj_model
 
-    ChannelFactoryInitialize(config.DOMAIN_ID, config.INTERFACE)
-    unitree = UnitreeSdk2Bridge(mj_model, mj_data)
+    # ChannelFactoryInitialize(config.DOMAIN_ID, config.INTERFACE)
+    # unitree = UnitreeSdk2Bridge(mj_model, mj_data)
 
-    if config.USE_JOYSTICK:
-        unitree.SetupJoystick(device_id=0, js_type=config.JOYSTICK_TYPE)
-    if config.PRINT_SCENE_INFORMATION:
-        unitree.PrintSceneInformation()
+    # if config.USE_JOYSTICK:
+    #     unitree.SetupJoystick(device_id=0, js_type=config.JOYSTICK_TYPE)
+    # if config.PRINT_SCENE_INFORMATION:
+    #     unitree.PrintSceneInformation()
 
     while viewer.is_running():
         step_start = time.perf_counter()
