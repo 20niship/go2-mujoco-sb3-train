@@ -55,7 +55,7 @@ class MultiGo2Env(MujocoEnv):
         #     shape=(self.num_agents * self.agent_joint_num,),
         #     dtype=np.float32,
         # )
-        self.cmd_vel = [1, 0, 1]
+        self.cmd_vel = [1, 0, 0]
 
         self._reset_noise_scale = 0.02  # リセット時のノイズスケール
 
@@ -68,11 +68,11 @@ class MultiGo2Env(MujocoEnv):
         self.rot_euler = np.zeros(3, dtype=np.float32)  # オイラー角
 
     def reset(self, seed=None, options=None):
-        self.cmd_vel = [
-            random.uniform(-1.0, 1.0),  # x方向の速度
-            random.uniform(-1.0, 1.0),  # y方向の速度
-            random.uniform(-1.0, 1.0),  # 角速度
-        ]
+        # self.cmd_vel = [
+        #     random.uniform(-1.0, 1.0),  # x方向の速度
+        #     random.uniform(-1.0, 1.0),  # y方向の速度
+        #     random.uniform(-1.0, 1.0),  # 角速度
+        # ]
         self.reset_model()
         self.nsteps = 0
         obs = self._get_obs()
