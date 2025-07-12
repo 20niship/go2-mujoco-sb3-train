@@ -96,9 +96,6 @@ class MultiGo2Env(MujocoEnv):
     def _do_action_pid(self, action: np.ndarray):
         Kp = 60.0  # 比例ゲイン
         Kd = 5.0  # 微分ゲイン
-
-        Kp = 0.0  # 比例ゲイン
-        Kd = 0.0  # 微分ゲイン
         error = action - self.jpos
         torque = Kp * error - Kd * self.jvel
         self.do_simulation(torque, self.frame_skip)
