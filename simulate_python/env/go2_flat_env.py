@@ -118,7 +118,7 @@ class MultiGo2Env(MujocoEnv):
         xy_velocity = (xy_pos_after - xy_pos_before) / self.dt
         x_vel, y_vel = xy_velocity
 
-        forward_rew = x_vel - y_vel
+        forward_rew = x_vel - abs(y_vel) * 0.5
         ctrl_cost = np.sum(np.square(action)) * 0.01
 
         terminated = self.terminated()
