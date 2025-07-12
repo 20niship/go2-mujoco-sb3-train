@@ -131,7 +131,7 @@ class MultiGo2Env(MujocoEnv):
         if terminated:
             healthy_reward = -10.0
 
-        imu_cost = -0.5 * (np.linalg.norm(self.imu_gyro))  # IMUのコスト
+        imu_cost = -0.02 * (np.linalg.norm(self.imu_gyro))
 
         reward = forward_rew + healthy_reward - ctrl_cost + imu_cost
 
