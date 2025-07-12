@@ -29,4 +29,6 @@ class LearningConfig:
     total_timesteps: int = 2000000
     buffer_size: int = 1000000
     learning_rate: float = 0.001
+    wandb_log_steps: int = 1000
+    log_wandb: bool = True
     gui = False

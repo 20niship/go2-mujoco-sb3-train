@@ -4,6 +4,7 @@ import random
 from gymnasium.envs.mujoco import MujocoEnv
 import config
 from .utils import quat_to_euler, LearningConfig
+import wandb
 
 
 class MultiGo2Env(MujocoEnv):
@@ -33,8 +34,10 @@ class MultiGo2Env(MujocoEnv):
         )
 
         self.num_agents = 1  # 複数体のロボットを扱う
+        self.nsteps = 0
 
         self.observation_space = obs_space
+        self.cfg = cfg
         self.render_mode = "human" if cfg.gui else None
         self.action_space = Box(
             low=-2,
@@ -71,6 +74,7 @@ class MultiGo2Env(MujocoEnv):
             random.uniform(-1.0, 1.0),  # 角速度
         ]
         self.reset_model()
+        self.nsteps = 0
         obs = self._get_obs()
 
         return obs, {}
@@ -81,14 +85,6 @@ class MultiGo2Env(MujocoEnv):
         base_height = self.get_body_com("base_link")[2]
         euler = self.rot_euler * 180 / np.pi  # ラジアンから度に変換
         return base_height < 0.2 or abs(euler[1]) > 45 or abs(euler[2]) > 45
-
-    @property
-    def healthy_reward(self):
-        # ロボットが倒れていない場合の報酬
-        if not self.terminated:
-            return 1.0
-        else:
-            return -1.0
 
     def control_cost(self, action: np.ndarray):
         # アクションの大きさに基づいてコストを計算
@@ -109,45 +105,49 @@ class MultiGo2Env(MujocoEnv):
         torque = Kp * error - Kd * self.jvel
         self.do_simulation(torque, self.frame_skip)
 
+    def _get_xy_pos(self):
+        # ロボットの位置を取得
+        xy_pos = self.get_body_com("base_link")[:2].copy()  # x, y座標を取得
+        return xy_pos
+
     def step(self, action: np.ndarray):
         action = action.flatten()
-        xy_position_before = self.get_body_com("base_link")[:2].copy()
+        xy_pos_before = self._get_xy_pos()
         self._do_action_pid(action)
 
         if self.render_mode == "human":
             self.render()
 
-        xy_position_after = self.get_body_com("base_link")[:2].copy()
+        xy_pos_after = self._get_xy_pos()
 
-        xy_velocity = (xy_position_after - xy_position_before) / self.dt
-        x_velocity, y_velocity = xy_velocity
+        xy_velocity = (xy_pos_after - xy_pos_before) / self.dt
+        x_vel, y_vel = xy_velocity
 
-        forward_reward = x_velocity
-        healthy_reward = self.healthy_reward
+        forward_rew = x_vel - y_vel
+        healthy_reward = 0.1
 
-        rewards = forward_reward + healthy_reward
-
-        costs = ctrl_cost = self.control_cost(action)
+        ctrl_cost = self.control_cost(action)
+        reward = forward_rew + healthy_reward - ctrl_cost
 
         terminated = self.terminated()
         obs = self._get_obs()
         info = {
-            "reward_forward": forward_reward,
-            "reward_ctrl": -ctrl_cost,
-            "reward_survive": healthy_reward,
-            "x_position": xy_position_after[0],
-            "y_position": xy_position_after[1],
-            "distance_from_origin": np.linalg.norm(xy_position_after, ord=2),
-            "x_velocity": x_velocity,
-            "y_velocity": y_velocity,
-            "forward_reward": forward_reward,
+            "info/rew_forward": forward_rew,
+            "info/ctrl_cost": -ctrl_cost,
+            "info/rew_survive": healthy_reward,
+            "info/x_position": xy_pos_after[0],
+            "info/y_position": xy_pos_after[1],
         }
+
+        if self.cfg.log_wandb and self.nsteps % self.cfg.wandb_log_steps == 0:
+            wandb.log(info)  # type: ignore
+
         # if self._use_contact_forces:
         #     contact_cost = self.contact_cost
         #     costs += contact_cost
         #     info["reward_ctrl"] = -contact_cost
 
-        reward = rewards - costs
+        self.prev_action = action.copy()  # 前のアクションを保存
 
         if self.render_mode == "human":
             self.render()
