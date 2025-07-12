@@ -124,12 +124,16 @@ class MultiGo2Env(MujocoEnv):
         x_vel, y_vel = xy_velocity
 
         forward_rew = x_vel - y_vel
-        healthy_reward = 0.1
-
         ctrl_cost = self.control_cost(action)
-        reward = forward_rew + healthy_reward - ctrl_cost
 
         terminated = self.terminated()
+
+        healthy_reward = 0.2
+        if terminated:
+            healthy_reward = -10.0
+
+        reward = forward_rew + healthy_reward - ctrl_cost
+
         obs = self._get_obs()
         info = {
             "info/rew_forward": forward_rew,
