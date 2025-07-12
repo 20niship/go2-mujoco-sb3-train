@@ -86,10 +86,6 @@ class MultiGo2Env(MujocoEnv):
         euler = self.rot_euler * 180 / np.pi  # ラジアンから度に変換
         return base_height < 0.2 or abs(euler[1]) > 45 or abs(euler[2]) > 45
 
-    def control_cost(self, action: np.ndarray):
-        # アクションの大きさに基づいてコストを計算
-        return np.sum(np.square(action)) * 0.01
-
     @property
     def contact_cost(self):
         # 接触力に基づいてコストを計算
@@ -101,6 +97,8 @@ class MultiGo2Env(MujocoEnv):
         Kp = 60.0  # 比例ゲイン
         Kd = 5.0  # 微分ゲイン
 
+        Kp = 0.0  # 比例ゲイン
+        Kd = 0.0  # 微分ゲイン
         error = action - self.jpos
         torque = Kp * error - Kd * self.jvel
         self.do_simulation(torque, self.frame_skip)
@@ -112,6 +110,7 @@ class MultiGo2Env(MujocoEnv):
 
     def step(self, action: np.ndarray):
         action = action.flatten()
+        action = np.zeros_like(action)
         xy_pos_before = self._get_xy_pos()
         self._do_action_pid(action)
 
@@ -124,7 +123,7 @@ class MultiGo2Env(MujocoEnv):
         x_vel, y_vel = xy_velocity
 
         forward_rew = x_vel - y_vel
-        ctrl_cost = self.control_cost(action)
+        ctrl_cost = np.sum(np.square(action)) * 0.01
 
         terminated = self.terminated()
 
@@ -132,13 +131,16 @@ class MultiGo2Env(MujocoEnv):
         if terminated:
             healthy_reward = -10.0
 
-        reward = forward_rew + healthy_reward - ctrl_cost
+        imu_cost = -0.5 * (np.linalg.norm(self.imu_gyro))  # IMUのコスト
+
+        reward = forward_rew + healthy_reward - ctrl_cost + imu_cost
 
         obs = self._get_obs()
         info = {
             "info/rew_forward": forward_rew,
             "info/ctrl_cost": -ctrl_cost,
             "info/rew_survive": healthy_reward,
+            "info/rew_imu": imu_cost,
             "info/x_position": xy_pos_after[0],
             "info/y_position": xy_pos_after[1],
         }
