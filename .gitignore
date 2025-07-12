@@ -3,3 +3,8 @@
 **/__pycache__/
 **/log/
 **/install/
+
+*.swp
+tensorboard/
+uv.lock
+poetry.lock
