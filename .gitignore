@@ -12,3 +12,5 @@ log/
 logs/
 wandb/
 models/
+
+.DS_Store
