@@ -7,7 +7,7 @@ import config
 
 
 class MultiGo2Env(MujocoEnv):
-    OBS_SHAPE = 46  # 観測空間の形状
+    OBS_SHAPE = 45  # 観測空間の形状
     NUM_JOINTS = 12  # 1体の関節数（例）
 
     metadata = {
@@ -39,8 +39,8 @@ class MultiGo2Env(MujocoEnv):
         render = True  # config.USE_RENDER
         self.render_mode = "human" if render else None
         self.action_space = Box(
-            low=-3,
-            high=3,
+            low=-100,
+            high=100,
             shape=(self.num_agents * self.NUM_JOINTS,),
             dtype=np.float32,
         )
@@ -55,6 +55,7 @@ class MultiGo2Env(MujocoEnv):
         #     dtype=np.float32,
         # )
         self.cmd_vel = [1, 0, 1]
+        self.jpos = np.zeros(self.NUM_JOINTS, dtype=np.float32)
 
     def reset(self, seed=None, options=None):
         self.cmd_vel = [
@@ -91,9 +92,20 @@ class MultiGo2Env(MujocoEnv):
         contact_cost = np.sum(np.square(contact_forces)) * 0.001
         return contact_cost
 
+    def _do_action_pid(self, action: np.ndarray):
+        Kp = 60.0  # 比例ゲイン
+        Kd = 5.0  # 微分ゲイン
+
+        error = action - self.jpos
+        torque = Kp * error - Kd * self.jvel
+        self.do_simulation(torque, self.frame_skip)
+
     def step(self, action: np.ndarray):
+        action = action.flatten()
+        action = np.array([-0.0] * 12)
+
         xy_position_before = self.get_body_com("base_link")[:2].copy()
-        self.do_simulation(action, self.frame_skip)
+        self._do_action_pid(action)
 
         if self.render_mode == "human":
             self.render()
@@ -132,17 +144,15 @@ class MultiGo2Env(MujocoEnv):
 
         if self.render_mode == "human":
             self.render()
-        print(obs, reward, terminated, False, info)
         return obs, reward, terminated, False, info
 
     def _get_obs(self):
         position = self.data.qpos.flat.copy()
         velocity = self.data.qvel.flat.copy()
         sensor = self.data.sensordata
-        print(len(sensor))
 
-        jpos = sensor[0:12]  # 各関節の位置
-        jvel = sensor[12:24]  # 各関節の速度
+        self.jpos = sensor[0:12]  # 各関節の位置
+        self.jvel = sensor[12:24]  # 各関節の速度
         force = sensor[24:36]  # 各関節のトルク
         imu_quat = sensor[36:40]  # IMUのクォータニオン
         imu_gyro = sensor[40:43]
@@ -157,11 +167,12 @@ class MultiGo2Env(MujocoEnv):
 
         obs = np.concatenate(
             [
-                imu_quat,
+                imu_acc,
+                # imu_quat,
                 imu_gyro,
                 self.cmd_vel,  # コマンド速度
-                jpos,
-                jvel,
+                self.jpos,
+                self.jvel,
                 self.prev_action,  # 前のアクション
             ]
         )
