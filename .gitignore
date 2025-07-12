@@ -9,3 +9,6 @@ tensorboard/
 uv.lock
 poetry.lock
 log/
+logs/
+wandb/
+models/
